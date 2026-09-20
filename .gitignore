@@ -1,0 +1,11 @@
+.gradle/
+build/
+# Local-only overrides (Atlas connection string with real credentials) -
+# Spring Boot auto-loads this file from the working directory, never commit it.
+config/
+!gradle/wrapper/gradle-wrapper.jar
+uploads/
+.idea/
+*.iml
+out/
+.DS_Store
