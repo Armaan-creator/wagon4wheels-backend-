@@ -2,7 +2,10 @@
 build/
 # Local-only overrides (Atlas connection string with real credentials) -
 # Spring Boot auto-loads this file from the working directory, never commit it.
-config/
+# Leading slash anchors this to the project root ONLY - without it, this
+# rule also matched src/main/java/.../backend/config/ (the Java package)
+# and silently excluded SecurityConfig.java from every commit.
+/config/
 !gradle/wrapper/gradle-wrapper.jar
 uploads/
 .idea/
