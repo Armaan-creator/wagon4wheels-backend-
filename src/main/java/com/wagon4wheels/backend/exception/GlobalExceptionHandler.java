@@ -6,6 +6,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.Map;
 
@@ -34,6 +35,14 @@ public class GlobalExceptionHandler {
                 : e.getBindingResult().getFieldErrors().get(0).getField()
                     + " " + e.getBindingResult().getFieldErrors().get(0).getDefaultMessage();
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", message));
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Map<String, String>> handleNoResourceFound(NoResourceFoundException e) {
+        // A missing static file (e.g. an uploaded image that no longer exists
+        // on disk) should be a clean 404, not fall through to the generic
+        // 500 handler below.
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Not found"));
     }
 
     @ExceptionHandler(Exception.class)
