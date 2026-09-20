@@ -12,9 +12,11 @@ import java.util.List;
 public class CarService {
 
     private final CarRepository carRepository;
+    private final FileStorageService fileStorageService;
 
-    public CarService(CarRepository carRepository) {
+    public CarService(CarRepository carRepository, FileStorageService fileStorageService) {
         this.carRepository = carRepository;
+        this.fileStorageService = fileStorageService;
     }
 
     public List<Car> getAll() {
@@ -34,13 +36,23 @@ public class CarService {
 
     public Car update(String id, CarRequest request) {
         Car car = getById(id);
+
+        List<String> oldImages = car.getImages();
+        List<String> newImages = request.getImages();
+        if (oldImages != null) {
+            oldImages.stream()
+                    .filter(url -> newImages == null || !newImages.contains(url))
+                    .forEach(fileStorageService::deleteByUrl);
+        }
+
         applyRequest(car, request);
         return carRepository.save(car);
     }
 
     public void delete(String id) {
-        if (!carRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Car not found: " + id);
+        Car car = getById(id);
+        if (car.getImages() != null) {
+            car.getImages().forEach(fileStorageService::deleteByUrl);
         }
         carRepository.deleteById(id);
     }

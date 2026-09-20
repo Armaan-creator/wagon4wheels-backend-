@@ -1,46 +1,51 @@
 package com.wagon4wheels.backend.service;
 
-import org.springframework.beans.factory.annotation.Value;
+import org.bson.types.ObjectId;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.gridfs.GridFsTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
+// Stores uploaded images in MongoDB itself (via GridFS) instead of local
+// disk - local disk on most cloud hosts (Render included) is wiped on every
+// redeploy, but MongoDB Atlas is real persistent storage.
 @Service
 public class FileStorageService {
 
-    private final Path uploadDir;
+    private final GridFsTemplate gridFsTemplate;
 
-    public FileStorageService(@Value("${app.upload.dir}") String uploadDir) {
-        this.uploadDir = Paths.get(uploadDir).toAbsolutePath().normalize();
-        try {
-            Files.createDirectories(this.uploadDir);
-        } catch (IOException e) {
-            throw new RuntimeException("Could not create upload directory", e);
-        }
+    public FileStorageService(GridFsTemplate gridFsTemplate) {
+        this.gridFsTemplate = gridFsTemplate;
     }
 
     public List<String> store(List<MultipartFile> files) {
         List<String> urls = new ArrayList<>();
         for (MultipartFile file : files) {
             String original = file.getOriginalFilename() != null ? file.getOriginalFilename() : "file";
-            String extension = original.contains(".") ? original.substring(original.lastIndexOf('.')) : "";
-            String filename = UUID.randomUUID() + extension;
-
             try {
-                Files.copy(file.getInputStream(), uploadDir.resolve(filename));
+                Object id = gridFsTemplate.store(file.getInputStream(), original, file.getContentType());
+                urls.add("/api/images/" + id.toString());
             } catch (IOException e) {
                 throw new RuntimeException("Failed to store file: " + original, e);
             }
-
-            urls.add("/uploads/" + filename);
         }
         return urls;
+    }
+
+    // Removes a stored image given its "/api/images/{id}" URL (accepts a
+    // full URL or just the path - only the trailing id segment matters).
+    public void deleteByUrl(String url) {
+        String id = url.substring(url.lastIndexOf('/') + 1);
+        try {
+            gridFsTemplate.delete(Query.query(Criteria.where("_id").is(new ObjectId(id))));
+        } catch (IllegalArgumentException e) {
+            // Not a GridFS id (e.g. an old local-disk URL from before this
+            // migration, or an external URL) - nothing for us to clean up.
+        }
     }
 }
